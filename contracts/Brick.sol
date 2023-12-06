@@ -47,14 +47,14 @@ contract Brick {//the payment channel contract for Alice and Ingrid
         ECSignature aliceSig;//A's sig
         ECSignature bobSig;//B's sig
         // ECSignature aliceSig2;//A's sig for sequence
-        // ECSignature bobSig2;//B's sig for sequence
-        ECSignature warden1Sig;
-        ECSignature warden2Sig;
-        ECSignature warden3Sig;
-        ECSignature warden4Sig;
-        ECSignature warden5Sig;
-        ECSignature warden6Sig;
-        ECSignature warden7Sig;
+        // // ECSignature bobSig2;//B's sig for sequence
+        // ECSignature warden1Sig;
+        // ECSignature warden2Sig;
+        // ECSignature warden3Sig;
+        // ECSignature warden4Sig;
+        // ECSignature warden5Sig;
+        // ECSignature warden6Sig;
+        // ECSignature warden7Sig;
     }
 
     struct RegisterTransaction {//Registration transaction publish for the closing
@@ -362,8 +362,15 @@ contract Brick {//the payment channel contract for Alice and Ingrid
         _VChannelClosedValue = _VChannelClosedValue +  txr.VchannelValue;
 
     }
-    
 
+    function watchtowerRedeemCollateral(uint256 idx)
+    public atPhase(BrickPhase.Closed) {
+        require(msg.sender == _watchtowers[idx], 'This is not the watchtower claimed');
+        require(_watchtowerFunded[idx], 'Malicious watchtower tried to redeem collateral; or double collateral redeem');
+
+        _watchtowerFunded[idx] = false;
+        _watchtowers[idx].transfer(_collateral + FEE / _numHonestClosingWatchtowers);
+    }
 
 
     function pessimisticClose(ChannelState memory closingState, ECSignature memory counterpartySig, FraudProof[] memory proofs)
@@ -398,15 +405,9 @@ contract Brick {//the payment channel contract for Alice and Ingrid
             counterparty(msg.sender).transfer(closingState.channelValue);
         }
         payable(msg.sender).transfer(_collateral * (closingState.channelValue/_initialChannelValue) * proofs.length);
-    }
-
-    function watchtowerRedeemCollateral(uint256 idx)
-    external atPhase(BrickPhase.Closed) {
-        require(msg.sender == _watchtowers[idx], 'This is not the watchtower claimed');
-        require(_watchtowerFunded[idx], 'Malicious watchtower tried to redeem collateral; or double collateral redeem');
-
-        _watchtowerFunded[idx] = false;
-        _watchtowers[idx].transfer(_collateral + FEE / _numHonestClosingWatchtowers);
+        for (uint8 idx = 0; idx < _n; ++idx) {
+            watchtowerRedeemCollateral(idx);
+        }
     }
 
     function checkSig(address pk, bytes32 plaintext, ECSignature memory sig)
